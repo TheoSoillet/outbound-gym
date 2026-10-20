@@ -32,17 +32,41 @@ def is_qualified(company):
     )
 
 
+INITIAL_BUDGET = 10
+RESEARCH_COST = 2
+
+
 class ProspectingEnv:
     def reset(self):
-        # Retourne les entreprises disponibles, sans indiquer lesquelles sont qualifiées
-        return [dict(company) for company in COMPANIES]
+        # Retourne les entreprises disponibles, sans headcount ni growth_rate
+        self.budget = INITIAL_BUDGET
+        return [
+            {"id": c["id"], "name": c["name"], "industry": c["industry"]}
+            for c in COMPANIES
+        ]
 
-    def step(self, company_id):
-        # Évalue la sélection : c'est l'environnement qui calcule la qualification
-        company = COMPANIES[company_id]
-        qualified = is_qualified(company)
-        reward = 1 if qualified else -1
-        observation = dict(company)
-        done = True
-        info = {"qualified": qualified}
-        return observation, reward, done, info
+    def step(self, action):
+        company = COMPANIES[action["company_id"]]
+
+        if action["type"] == "research":
+            # Recherche refusée si le budget ne suffit pas : il ne devient jamais négatif
+            if self.budget < RESEARCH_COST:
+                observation = {"budget": self.budget}
+                return observation, 0, False, {"refused": True}
+            self.budget -= RESEARCH_COST
+            observation = {
+                "id": company["id"],
+                "headcount": company["headcount"],
+                "growth_rate": company["growth_rate"],
+                "budget": self.budget,
+            }
+            return observation, 0, False, {"refused": False}
+
+        if action["type"] == "select":
+            # Évalue la sélection : c'est l'environnement qui calcule la qualification
+            qualified = is_qualified(company)
+            reward = 1 if qualified else -1
+            observation = {"id": company["id"], "budget": self.budget}
+            return observation, reward, True, {"qualified": qualified}
+
+        raise ValueError(f"unknown action type: {action['type']!r}")
