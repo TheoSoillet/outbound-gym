@@ -1,3 +1,5 @@
+import pytest
+
 from outbound_gym.environment import ProspectingEnv
 
 
@@ -93,5 +95,24 @@ def test_reward_matches_icp_after_research():
         )
         _, reward, done, _ = env.step({"type": "select", "company_id": company_id})
         assert decision is qualified
-        assert reward == (1 if decision else -1)
+        assert reward == pytest.approx((1 if decision else -1) - 0.05 * 2)  # une recherche = 2 crédits
         assert done is True
+
+
+@pytest.mark.parametrize(
+    "qualified, num_researches, expected_reward, expected_credits",
+    [
+        (True, 0, 1.00, 0),    # réussite, 0 crédit
+        (True, 1, 0.90, 2),    # réussite, 2 crédits
+        (False, 2, -1.20, 4),  # échec, 4 crédits
+    ],
+)
+def test_select_reward_includes_cost_penalty(qualified, num_researches, expected_reward, expected_credits):
+    env = ProspectingEnv(seed=0)
+    env.reset()
+    for company_id in range(num_researches):
+        env.step({"type": "research", "company_id": company_id})
+    company_id = find_company_id(env, qualified)
+    observation, reward, done, info = env.step({"type": "select", "company_id": company_id})
+    assert reward == pytest.approx(expected_reward)
+    assert info["credits_spent"] == expected_credits

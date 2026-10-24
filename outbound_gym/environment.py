@@ -33,6 +33,7 @@ def is_qualified(company):
 
 INITIAL_BUDGET = 10
 RESEARCH_COST = 2
+COST_PENALTY = 0.05
 
 
 class ProspectingEnv:
@@ -73,8 +74,10 @@ class ProspectingEnv:
         if action["type"] == "select":
             # Évalue la sélection : c'est l'environnement qui calcule la qualification
             qualified = is_qualified(company)
-            reward = 1 if qualified else -1
+            # Pénalité appliquée une seule fois, sur tous les crédits dépensés pendant l'épisode
+            credits_spent = INITIAL_BUDGET - self.budget
+            reward = (1 if qualified else -1) - COST_PENALTY * credits_spent
             observation = {"id": company["id"], "budget": self.budget}
-            return observation, reward, True, {"qualified": qualified}
+            return observation, reward, True, {"qualified": qualified, "credits_spent": credits_spent}
 
         raise ValueError(f"unknown action type: {action['type']!r}")
